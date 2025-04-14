@@ -1,0 +1,175 @@
+import React, { useState } from "react";
+import axios from "axios";
+import "./App.css";
+import { FaFileAlt, FaVolumeUp, FaUserCheck, FaCloudUploadAlt } from "react-icons/fa";
+
+function App() {
+  const [image, setImage] = useState(null);
+  const [text, setText] = useState("");
+  const [audioUrl, setAudioUrl] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [scrolled, setScrolled] = useState(false);
+
+  // Handles file selection
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      console.log("Selected file:", file.name);
+      setImage(file);
+    }
+  };
+
+  // Scroll to the target section for file upload
+  function scrollToSection() {
+    const section = document.getElementById("targetSection");
+    section.scrollIntoView({ behavior: "smooth" });
+  }
+
+  // Uploads the file and processes it (image to text and text to speech)
+  const handleUpload = async () => {
+    if (!image) {
+      alert("Please select an image.");
+      return;
+    }
+
+    setLoading(true);
+    setProgress(0);
+
+    const formData = new FormData();
+    formData.append("image", image);
+
+    console.log("Uploading file:", image.name);
+
+    const config = {
+      headers: { "Content-Type": "multipart/form-data" },
+      onUploadProgress: (progressEvent) => {
+        const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+        setProgress(percent);
+      },
+    };
+
+    try {
+      const response = await axios.post("http://localhost:5000/upload", formData, config);
+      console.log("Server response:", response.data);
+
+      setText(response.data.text || "No text extracted.");
+      setAudioUrl(response.data.audio || "");
+      setProgress(100);
+    } catch (error) {
+      console.error("Error uploading image:", error);
+      alert("Error uploading image. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle scroll events for navbar visibility
+  React.useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 50) {
+        setScrolled(true);
+      } else {
+        setScrolled(false);
+      }
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  return (
+    <div className="app">
+      {/* Navbar */}
+      <nav className={`navbar ${scrolled ? "scrolled" : ""}`}>
+        <div className="logo">SpeakScript</div>
+      </nav>
+
+      {/* Hero Section */}
+      <div className="hero">
+        <h1>Convert Handwritten Notes to </h1>
+        <h1>Speech</h1>
+        <p>
+          Upload your handwritten documents and instantly convert them to text
+        </p>
+        <p>and speech. No more straining to read difficult handwriting.</p>
+        <button className="try-button" onClick={scrollToSection}>
+          Try it now ↓
+        </button>
+      </div>
+
+      {/* Offers Section */}
+      <div className="offers">
+        <h1>What We <span className="highlight">Offer</span></h1>
+        <div className="offer-cards">
+          <div className="offer-card">
+            <FaFileAlt className="icon" />
+            <h2>Accurate Text Extraction</h2>
+            <p>Our system uses custom machine learning model to accurately extract handwritten text.</p>
+          </div>
+          <div className="offer-card">
+            <FaVolumeUp className="icon" />
+            <h2>Instant Speech Conversion</h2>
+            <p>Convert extracted text into natural-sounding speech in seconds.</p>
+          </div>
+          <div className="offer-card">
+            <FaUserCheck className="icon" />
+            <h2>Easy-to-Use Interface</h2>
+            <p>Simply upload your document and get results with one click.</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Upload Section */}
+      <div className="upload-container" id="targetSection">
+        <h2>Upload a Document</h2>
+        <div className="upload-box">
+          <FaCloudUploadAlt className="upload-icon" />
+          <p>Drag and drop your image here or click to browse your files</p>
+          <input type="file" id="file-input" onChange={handleImageChange} hidden />
+          <label htmlFor="file-input" className="upload-button">
+            Select Image
+          </label>
+        </div>
+        {/* Show selected file name */}
+        {image && (
+          <div className="uploaded-preview">
+            <p className="file-name">✔ {image.name} selected</p>
+            <img
+              src={URL.createObjectURL(image)}
+              alt="Uploaded Preview"
+              className="uploaded-image"
+            />
+          </div>
+        )}
+
+        {image && (
+          <button onClick={handleUpload} disabled={loading} className="upload-submit">
+            {loading ? "Processing..." : "Convert"}
+          </button>
+        )}
+
+        {loading && <div className="progress-bar" style={{ width: `${progress}%` }}></div>}
+      </div>
+
+      {/* Result Section */}
+      {text && (
+        <div className="result-container">
+          <div className="result-card">
+            <h3>Extracted Text:</h3>
+            <p>{text}</p>
+          </div>
+          {audioUrl && (
+            <div className="audio-container">
+              <audio controls>
+                <source src={audioUrl} type="audio/mpeg" />
+                Your browser does not support the audio element.
+              </audio>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default App;
