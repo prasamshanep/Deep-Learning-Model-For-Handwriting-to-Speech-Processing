@@ -1,0 +1,60 @@
+const express = require("express");
+const multer = require("multer");
+const Tesseract = require("tesseract.js");
+const gTTS = require("gtts");
+const cors = require("cors");
+const fs = require("fs");
+const axios = require("axios"); // to call Python backend
+
+const app = express();
+const port = 5000;
+
+app.use(cors());
+app.use(express.json());
+
+const storage = multer.memoryStorage();
+const upload = multer({ storage: storage });
+
+app.post("/upload", upload.single("image"), async (req, res) => {
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+
+    const method = req.body.method || "tesseract"; // default to Tesseract
+
+    try {
+        let text = "";
+
+        if (method === "tesseract") {
+            const result = await Tesseract.recognize(req.file.buffer, "eng");
+            text = result.data.text.trim();
+        } else if (method === "model") {
+            const response = await axios.post("http://localhost:8000/recognize", {
+                image: req.file.buffer.toString("base64")
+            });
+            text = response.data.text.trim();
+        }
+
+        if (!text) return res.status(400).json({ error: "No readable text found" });
+
+        const audioFilePath = "output.mp3";
+        if (fs.existsSync(audioFilePath)) fs.unlinkSync(audioFilePath);
+
+        const speech = new gTTS(text, "en");
+        speech.save(audioFilePath, (err) => {
+            if (err) return res.status(500).json({ error: "Error generating speech" });
+            res.json({ text, audio: `http://localhost:${port}/audio` });
+        });
+
+    } catch (error) {
+        console.error("Error processing image:", error);
+        res.status(500).json({ error: "Error processing image" });
+    }
+});
+
+app.get("/audio", (req, res) => {
+    res.sendFile(__dirname + "/output.mp3");
+});
+
+app.listen(port, () => {
+    console.log(`✅ Node server running at http://localhost:${port}`);
+});
+1.	
